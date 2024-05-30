@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "264378527800",
+    "project_id": "carritoscompartidos",
+    "storage_bucket": "carritoscompartidos.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:264378527800:android:39d47931991758394cf6cd",
+        "android_client_info": {
+          "package_name": "com.example.carritoscompartidos"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB8bp-toHmTXZODWSC-fqe4v3C8nQyGt1I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
