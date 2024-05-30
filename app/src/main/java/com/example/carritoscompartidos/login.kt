@@ -7,9 +7,10 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,8 @@ import com.google.firebase.auth.FirebaseUser
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier) {
@@ -139,7 +142,7 @@ fun RegisterDialog(
         text = {
             Column {
                 Text("Selecciona una opción:")
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(
                         selected = (selectedOption == "Conductor"),
@@ -188,18 +191,23 @@ fun RegisterDialog(
 fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> Unit) {
     val context = LocalContext.current
     var nombre by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
     var placas by remember { mutableStateOf("") }
     var telefono by remember { mutableStateOf("") }
     var correoError by remember { mutableStateOf(false) }
     var placasError by remember { mutableStateOf(false) }
     var telefonoError by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
     val tipoConductor = "1"
 
-    val allFieldsValid = !correoError && !placasError && !telefonoError && nombre.isNotBlank()
+    val allFieldsValid = !correoError && !placasError && !telefonoError && !passwordError && nombre.isNotBlank() && password.isNotBlank()
 
-    var showDialog by remember { mutableStateOf(false) }
-
+    fun isValidPassword(password: String): Boolean {
+        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$]).{8,}$")
+        return passwordRegex.containsMatchIn(password)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -213,7 +221,35 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                     onValueChange = { nombre = it },
                     label = { Text("Nombre") }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
+                TextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        passwordError = !isValidPassword(it)
+                    },
+                    label = { Text("Contraseña") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (passwordVisible)
+                            Icons.Filled.Lock
+                        else Icons.Filled.Warning
+
+                        IconButton(onClick = {
+                            passwordVisible = !passwordVisible
+                        }) {
+                            Icon(imageVector = image, contentDescription = null)
+                        }
+                    },
+                    isError = passwordError
+                )
+                if (passwordError) {
+                    Text(
+                        text = "La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula, un número y un carácter especial (@, _, !, $)",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(5.dp))
                 TextField(
                     value = correo,
                     onValueChange = {
@@ -223,14 +259,13 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                     label = { Text("Correo") },
                     isError = correoError
                 )
-                // Error
                 if (correoError) {
                     Text(
                         text = "El correo debe ser un @gmail.com",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
                 TextField(
                     value = placas,
                     onValueChange = {
@@ -246,7 +281,7 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
                 TextField(
                     value = telefono,
                     onValueChange = {
@@ -270,6 +305,7 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                     if (allFieldsValid) {
                         val data = mapOf(
                             "nombre" to nombre,
+                            "password" to password,
                             "correo" to correo,
                             "placas" to placas,
                             "telefono" to telefono,
@@ -307,12 +343,20 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
 fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> Unit) {
     val context = LocalContext.current
     var nombre by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var correo by remember { mutableStateOf("") }
     var nombreError by remember { mutableStateOf(false) }
     var correoError by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
     val tipoUsuario = "2"
 
-    val allFieldsValid = nombre.isNotBlank() && !nombreError && correo.isNotBlank() && !correoError
+    val allFieldsValid = nombre.isNotBlank() && !nombreError && correo.isNotBlank() && !correoError && !passwordError && password.isNotBlank()
+
+    fun isValidPassword(password: String): Boolean {
+        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$]).{8,}$")
+        return passwordRegex.containsMatchIn(password)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -336,7 +380,35 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(5.dp))
+                TextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        passwordError = !isValidPassword(it)
+                    },
+                    label = { Text("Contraseña") },
+                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        val image = if (passwordVisible)
+                            Icons.Filled.Lock
+                        else Icons.Filled.Warning
+
+                        IconButton(onClick = {
+                            passwordVisible = !passwordVisible
+                        }) {
+                            Icon(imageVector = image, contentDescription = null)
+                        }
+                    },
+                    isError = passwordError
+                )
+                if (passwordError) {
+                    Text(
+                        text = "La contraseña debe tener al menos 8 caracteres, incluir una mayúscula, una minúscula, un número y un carácter especial (@, _, !, $)",
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                Spacer(modifier = Modifier.height(5.dp))
                 TextField(
                     value = correo,
                     onValueChange = {
@@ -361,6 +433,7 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
                         val data = mapOf(
                             "nombre" to nombre,
                             "correo" to correo,
+                            "password" to password,
                             "tipo" to tipoUsuario
                         )
                         onSubmit(data)
