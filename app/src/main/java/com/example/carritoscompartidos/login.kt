@@ -1,6 +1,9 @@
+@file:Suppress("NAME_SHADOWING")
+
 package com.example.carritoscompartidos
 
 import android.content.Context
+import android.content.Intent
 import android.view.Gravity
 import android.widget.Toast
 import androidx.compose.foundation.Image
@@ -34,11 +37,18 @@ fun LoginScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
     var selectedOption by remember { mutableStateOf("") }
-    var userData by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
     var showDialog by remember { mutableStateOf(false) }
     var showFormDialog by remember { mutableStateOf(false) }
     var showLoginDialog by remember { mutableStateOf(false) }
+    var showWelcomeDialog by remember { mutableStateOf(false) }
+    var welcomeMessage by remember { mutableStateOf("") }
+
+    var loginEmail by remember { mutableStateOf("") }
+    var loginPassword by remember { mutableStateOf("") }
+    var loginError by remember { mutableStateOf(false) }
+
+    var userType by remember { mutableStateOf("") }
 
     Column(
         modifier = modifier
@@ -72,7 +82,6 @@ fun LoginScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    // Diálogo para ingresar correo y contraseña
     if (showLoginDialog) {
         AlertDialog(
             onDismissRequest = { showLoginDialog = false },
@@ -80,31 +89,44 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             text = {
                 Column {
                     OutlinedTextField(
-                        value = "",
-                        onValueChange = {},
+                        value = loginEmail,
+                        onValueChange = { loginEmail = it },
                         label = { Text("Correo electrónico") },
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email),
+                        isError = loginError
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
-                        value = "",
-                        onValueChange = {},
+                        value = loginPassword,
+                        onValueChange = { loginPassword = it },
                         label = { Text("Contraseña") },
                         visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password)
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password),
+                        isError = loginError
                     )
+                    if (loginError) {
+                        Text(text = "Error al iniciar sesión. Por favor, verifique sus credenciales.", color = Color.Red)
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        // Realizar acción de inicio de sesión aquí
-                        showLoginDialog = false
-                    },
-                    colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                        buttonColors(Color.Green.copy(alpha = 0.5f))
-                        buttonColors
+                        // Dentro del callback de éxito de verificación de credenciales
+                        verifyLoginCredentials(loginEmail, loginPassword, context) { success, name, type ->
+                            if (success) {
+                                welcomeMessage = "Bienvenido, $name"
+                                userType = type.toString()
+                                showWelcomeDialog = true
+                                showLoginDialog = false
+
+                            } else {
+                                loginError = true
+                            }
+                        }
                     }
+                    ,
+                    colors = ButtonDefaults.buttonColors(Color.Green.copy(alpha = 0.5f))
                 ) {
                     Text(text = "Ingresar", color = Color.Black.copy(alpha = 0.75f))
                 }
@@ -112,12 +134,38 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             dismissButton = {
                 Button(
                     onClick = { showLoginDialog = false },
-                    colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                        buttonColors(Color.Red.copy(alpha = 0.5f))
+                    colors = ButtonDefaults.buttonColors(Color.Red.copy(alpha = 0.5f))
+                ) {
+                    Text(text = "Cancelar", color = Color.Black.copy(alpha = 0.75f))
+                }
+            }
+        )
+    }
+
+    if (showWelcomeDialog) {
+        AlertDialog(
+            onDismissRequest = { showWelcomeDialog = false },
+            title = { Text(text = "Bienvenido") },
+            text = { Text(text = welcomeMessage) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Lanzar MapActivity y pasar el tipo de usuario como extra
+                        val intent = Intent(context, MapActivity::class.java)
+                        intent.putExtra("USER_TYPE", userType)
+                        context.startActivity(intent)
+                        // Limpiar los datos ingresados
+                        loginEmail = ""
+                        loginPassword = ""
+
+                        showWelcomeDialog = false
+                        loginError = false
+                    },colors = ButtonDefaults.run { val buttonColors: ButtonColors =
+                        ButtonDefaults.buttonColors(Color.Green.copy(alpha = 0.5f))
                         buttonColors
                     }
                 ) {
-                    Text(text = "Cancelar", color = Color.Black.copy(alpha = 0.75f))
+                    Text(text = "Ingresar", color = Color.Black.copy(alpha = 0.75f))
                 }
             }
         )
@@ -138,24 +186,8 @@ fun LoginScreen(modifier: Modifier = Modifier) {
     // Formulario de registro
     if (showFormDialog) {
         when (selectedOption) {
-            "Conductor" -> ConductorFormDialog(onDismiss = { showFormDialog = false }) { data ->
-                userData = data
-                showFormDialog = false
-                onSubmitConductor(data, context) {
-                    // Esta lambda se ejecutará si el registro es exitoso
-                    showToast(context, "Registro de conductor exitoso")
-                    showFormDialog = false // Cerrar el diálogo después del registro exitoso
-                }
-            }
-            "Usuario" -> UsuarioFormDialog(onDismiss = { showFormDialog = false }) { data ->
-                userData = data
-                showFormDialog = false
-                onSubmitUsuario(data, context) {
-                    // Esta lambda se ejecutará si el registro es exitoso
-                    showToast(context, "Registro de usuario exitoso")
-                    showFormDialog = false // Cerrar el diálogo después del registro exitoso
-                }
-            }
+            "Conductor" -> ConductorFormDialog(onDismiss = { showFormDialog = false })
+            "Usuario" -> UsuarioFormDialog(onDismiss = { showFormDialog = false })
         }
     }
 }
@@ -223,7 +255,7 @@ fun RegisterDialog(
 }
 
 @Composable
-fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> Unit) {
+fun ConductorFormDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     var nombre by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -375,7 +407,7 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
 }
 
 @Composable
-fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> Unit) {
+fun UsuarioFormDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     var nombre by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -576,6 +608,52 @@ fun onSubmitUsuario(data: Map<String, String>, context: Context, onDismiss: () -
             }
         }
     }
+}
+
+fun verifyLoginCredentials(
+    email: String, password: String, context: Context,
+    onResult: (Boolean, String?, String?) -> Unit
+) {
+    val database = Firebase.database
+    val usersRef = database.getReference("usuarios")
+    val conductorsRef = database.getReference("conductores")
+    val adminRef = database.getReference("administradores")
+
+    val listener = object : ValueEventListener {
+        override fun onDataChange(snapshot: DataSnapshot) {
+            var userFound = false
+            var userName: String? = null
+            var userType: String? = null
+
+            for (userSnapshot in snapshot.children) {
+                val userPassword = userSnapshot.child("password").getValue(String::class.java)
+                if (userSnapshot.child("correo").getValue(String::class.java) == email && userPassword == password) {
+                    userName = userSnapshot.child("nombre").getValue(String::class.java)
+                    userType = userSnapshot.child("tipo").getValue(String::class.java)
+                    userFound = true
+                    break
+                }
+            }
+
+            onResult(userFound, userName, userType)
+        }
+
+        override fun onCancelled(error: DatabaseError) {
+            showToast(context, "Error al verificar las credenciales: ${error.message}")
+            onResult(false, null, null)
+        }
+    }
+
+    usersRef.addListenerForSingleValueEvent(listener)
+    conductorsRef.addListenerForSingleValueEvent(listener)
+    adminRef.addListenerForSingleValueEvent(listener)
+}
+
+fun openMapActivity(context: Context, userType: String) {
+    val intent = Intent(context, MapActivity::class.java).apply {
+        putExtra("USER_TYPE", userType)
+    }
+    context.startActivity(intent)
 }
 
 @Preview(showBackground = true)
