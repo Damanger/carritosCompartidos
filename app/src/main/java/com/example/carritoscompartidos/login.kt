@@ -1,13 +1,11 @@
 package com.example.carritoscompartidos
 
-import android.app.Activity
 import android.content.Context
 import android.view.Gravity
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
@@ -20,15 +18,10 @@ import androidx.compose.ui.unit.dp
 import com.example.carritoscompartidos.ui.theme.CarritosCompartidosTheme
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.GoogleAuthProvider
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.firebase.auth.FirebaseUser
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 
@@ -39,24 +32,9 @@ fun LoginScreen(modifier: Modifier = Modifier) {
     var selectedOption by remember { mutableStateOf("") }
     var userData by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
 
-    val signInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                if (account != null) {
-                    firebaseAuthWithGoogle(context, account.idToken!!, selectedOption, userData)
-                } else {
-                    showToast(context, "Error al iniciar sesión con Google")
-                }
-            } catch (e: ApiException) {
-                showToast(context, "Error al iniciar sesión con Google: ${e.message}")
-            }
-        }
-    }
-
     var showDialog by remember { mutableStateOf(false) }
     var showFormDialog by remember { mutableStateOf(false) }
+    var showLoginDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -65,7 +43,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center // Centra verticalmente
     ) {
         Text(
-            text = "¡Carritos compartidos!",
+            text = "¡CompaRide!",
             fontSize = MaterialTheme.typography.headlineLarge.fontSize, // Tamaño de fuente del texto
             modifier = Modifier.padding(bottom = 5.dp) // Espacio entre el texto y la imagen
         )
@@ -76,16 +54,10 @@ fun LoginScreen(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.height(16.dp)) // Espacio entre imagen y botones
         Button(
-            onClick = {
-                val signInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                    .requestIdToken(context.getString(R.string.default_web_client_id))
-                    .requestEmail()
-                    .build()
-                val signInClient = GoogleSignIn.getClient(context, signInOptions)
-                signInLauncher.launch(signInClient.signInIntent) },
+            onClick = { showLoginDialog = true },
             modifier = Modifier.fillMaxWidth(0.8f) // Ancho del botón del 80% del ancho de la pantalla
         ) {
-            Text(text = "Ingresar con Google")
+            Text(text = "Ingresar")
         }
         Spacer(modifier = Modifier.height(16.dp)) // Espacio entre botones
         Button(
@@ -94,6 +66,57 @@ fun LoginScreen(modifier: Modifier = Modifier) {
         ) {
             Text(text = "Registrarme")
         }
+    }
+
+    // Diálogo para ingresar correo y contraseña
+    if (showLoginDialog) {
+        AlertDialog(
+            onDismissRequest = { showLoginDialog = false },
+            title = { Text(text = "Ingresar") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        label = { Text("Correo electrónico") },
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Email)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = "",
+                        onValueChange = {},
+                        label = { Text("Contraseña") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions.Default.copy(keyboardType = KeyboardType.Password)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Realizar acción de inicio de sesión aquí
+                        showLoginDialog = false
+                    },
+                    colors = ButtonDefaults.run { val buttonColors: ButtonColors =
+                        buttonColors(Color.Green.copy(alpha = 0.5f))
+                        buttonColors
+                    }
+                ) {
+                    Text(text = "Ingresar", color = Color.Black.copy(alpha = 0.75f))
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showLoginDialog = false },
+                    colors = ButtonDefaults.run { val buttonColors: ButtonColors =
+                        buttonColors(Color.Red.copy(alpha = 0.5f))
+                        buttonColors
+                    }
+                ) {
+                    Text(text = "Cancelar", color = Color.Black.copy(alpha = 0.75f))
+                }
+            }
+        )
     }
 
     // Dialogos
@@ -205,7 +228,7 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
     val allFieldsValid = !correoError && !placasError && !telefonoError && !passwordError && nombre.isNotBlank() && password.isNotBlank()
 
     fun isValidPassword(password: String): Boolean {
-        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$]).{8,}$")
+        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$])(?!.*\\s).{8,}$")
         return passwordRegex.containsMatchIn(password)
     }
 
@@ -354,7 +377,7 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
     val allFieldsValid = nombre.isNotBlank() && !nombreError && correo.isNotBlank() && !correoError && !passwordError && password.isNotBlank()
 
     fun isValidPassword(password: String): Boolean {
-        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$]).{8,}$")
+        val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$])(?!.*\\s).{8,}$")
         return passwordRegex.containsMatchIn(password)
     }
 
@@ -493,41 +516,6 @@ fun onSubmitUsuario(data: Map<String, String>, context: Context) {
             showToast(context, "Error al registrar usuario: ${task.exception?.message}")
         }
     }
-}
-
-private fun registerUserInDatabase(user: FirebaseUser?, selectedOption: String, additionalData: Map<String, String>) {
-    user?.let { firebaseUser ->
-        val database = Firebase.database
-        val ref = when (selectedOption) {
-            "Conductor" -> database.getReference("conductores")
-            "Usuario" -> database.getReference("usuarios")
-            else -> null
-        }
-
-        val userData = additionalData.toMutableMap().apply {
-            this["userId"] = firebaseUser.uid
-            this["nombre"] = firebaseUser.displayName ?: ""
-            this["correo"] = firebaseUser.email ?: ""
-        }
-
-        ref?.push()?.setValue(userData)
-    }
-}
-
-private fun firebaseAuthWithGoogle(context: Context, idToken: String, selectedOption: String, additionalData: Map<String, String>) {
-    val credential = GoogleAuthProvider.getCredential(idToken, null)
-    FirebaseAuth.getInstance().signInWithCredential(credential)
-        .addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                // Sign in success, update UI with the signed-in user's information
-                val user = FirebaseAuth.getInstance().currentUser
-                showToast(context, "Inicio de sesión exitoso: ${user?.displayName}")
-                registerUserInDatabase(user, selectedOption, additionalData)
-            } else {
-                // If sign in fails, display a message to the user.
-                showToast(context, "Error al iniciar sesión: ${task.exception?.message}")
-            }
-        }
 }
 
 @Preview(showBackground = true)
