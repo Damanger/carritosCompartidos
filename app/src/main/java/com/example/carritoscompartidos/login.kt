@@ -78,7 +78,7 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             onClick = { showDialog = true },
             modifier = Modifier.fillMaxWidth(0.8f) // Ancho del botón del 80% del ancho de la pantalla
         ) {
-            Text(text = "Registrarme")
+            Text(text = "Regístrate")
         }
     }
 
