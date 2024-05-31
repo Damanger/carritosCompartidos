@@ -33,4 +33,6 @@ This project serves as a boilerplate for implementing Firebase authentication in
 
 Special thanks to Firebase for providing robust authentication services and Kotlin for its elegance and conciseness in Android development.
 
-![Project Image](path/to/image.png)
+<p align="center">
+  <img src="login.png" alt="Project Image">
+</p>
