@@ -24,6 +24,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.FirebaseDatabase
 
 @Composable
 fun LoginScreen(modifier: Modifier = Modifier) {
@@ -137,12 +141,20 @@ fun LoginScreen(modifier: Modifier = Modifier) {
             "Conductor" -> ConductorFormDialog(onDismiss = { showFormDialog = false }) { data ->
                 userData = data
                 showFormDialog = false
-                onSubmitConductor(data, context)
+                onSubmitConductor(data, context) {
+                    // Esta lambda se ejecutará si el registro es exitoso
+                    showToast(context, "Registro de conductor exitoso")
+                    showFormDialog = false // Cerrar el diálogo después del registro exitoso
+                }
             }
             "Usuario" -> UsuarioFormDialog(onDismiss = { showFormDialog = false }) { data ->
                 userData = data
                 showFormDialog = false
-                onSubmitUsuario(data, context)
+                onSubmitUsuario(data, context) {
+                    // Esta lambda se ejecutará si el registro es exitoso
+                    showToast(context, "Registro de usuario exitoso")
+                    showFormDialog = false // Cerrar el diálogo después del registro exitoso
+                }
             }
         }
     }
@@ -277,14 +289,16 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                     value = correo,
                     onValueChange = {
                         correo = it
-                        correoError = !it.endsWith("@gmail.com")
+                        val correoParts = it.split("@")
+                        correoError = correoParts.size != 2 || !correoParts[1].endsWith("gmail.com") && !correoParts[1].endsWith("hotmail.com") && !correoParts[1].endsWith("gs.utm.mx")
+
                     },
                     label = { Text("Correo") },
                     isError = correoError
                 )
                 if (correoError) {
                     Text(
-                        text = "El correo debe ser un @gmail.com",
+                        text = "El correo debe ser un @gmail.com o @hotmail.com o @gs.utm.mx",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -334,15 +348,16 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
                             "telefono" to telefono,
                             "tipo" to tipoConductor
                         )
-                        onSubmit(data)
+                        onSubmitConductor(data, context) {
+                            // Esta lambda se ejecutará si el registro es exitoso
+                            showToast(context, "Registro de conductor exitoso")
+                            onDismiss() // Cerrar el diálogo después del registro exitoso
+                        }
                     } else {
                         showToast(context, "Por favor completa todos los campos correctamente antes de continuar")
                     }
                 },
-                colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                    buttonColors(Color.Green.copy(alpha = 0.5f))
-                    buttonColors
-                },
+                colors = ButtonDefaults.buttonColors(Color.Green.copy(alpha = 0.5f)),
                 enabled = allFieldsValid
             ) {
                 Text("Registrarse", color = Color.Black.copy(alpha = 0.75f))
@@ -351,10 +366,7 @@ fun ConductorFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -
         dismissButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                    buttonColors(Color.Red.copy(alpha = 0.5f))
-                    buttonColors
-                }
+                colors = ButtonDefaults.buttonColors(Color.Red.copy(alpha = 0.5f))
             ) {
                 Text("Cancelar", color = Color.Black.copy(alpha = 0.75f))
             }
@@ -374,7 +386,7 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
     var passwordVisible by remember { mutableStateOf(false) }
     val tipoUsuario = "2"
 
-    val allFieldsValid = nombre.isNotBlank() && !nombreError && correo.isNotBlank() && !correoError && !passwordError && password.isNotBlank()
+    val allFieldsValid = nombre.isNotBlank() && !nombreError && !passwordError && !correoError && password.isNotBlank()
 
     fun isValidPassword(password: String): Boolean {
         val passwordRegex = Regex("^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[@_!$])(?!.*\\s).{8,}$")
@@ -392,14 +404,14 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
                     value = nombre,
                     onValueChange = {
                         nombre = it
-                        nombreError = it.isBlank()
+                        nombreError = nombre.length > 25
                     },
-                    label = { Text("Nombre") },
+                    label = { Text("Nombre Completo") },
                     isError = nombreError
                 )
                 if (nombreError) {
                     Text(
-                        text = "Por favor ingresa un nombre",
+                        text = "El nombre debe tener un máximo de 25 caracteres",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -436,14 +448,15 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
                     value = correo,
                     onValueChange = {
                         correo = it
-                        correoError = !it.endsWith("@gmail.com")
+                        val correoParts = it.split("@")
+                        correoError = correoParts.size != 2 || !correoParts[1].endsWith("gmail.com") && !correoParts[1].endsWith("hotmail.com") && !correoParts[1].endsWith("gs.utm.mx")
                     },
                     label = { Text("Correo") },
                     isError = correoError
                 )
                 if (correoError) {
                     Text(
-                        text = "El correo debe ser un @gmail.com",
+                        text = "El correo debe ser un @gmail.com o @hotmail.com o @gs.utm.mx",
                         color = MaterialTheme.colorScheme.error
                     )
                 }
@@ -455,18 +468,20 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
                     if (allFieldsValid) {
                         val data = mapOf(
                             "nombre" to nombre,
-                            "correo" to correo,
                             "password" to password,
+                            "correo" to correo,
                             "tipo" to tipoUsuario
                         )
-                        onSubmit(data)
+                        onSubmitUsuario(data, context) {
+                            // Esta lambda se ejecutará si el registro es exitoso
+                            showToast(context, "Registro de usuario exitoso")
+                            onDismiss() // Cerrar el diálogo después del registro exitoso
+                        }
                     } else {
                         showToast(context, "Por favor completa todos los campos correctamente antes de continuar")
                     }
-                }, colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                    buttonColors(Color.Green.copy(alpha = 0.5f))
-                    buttonColors
                 },
+                colors = ButtonDefaults.buttonColors(Color.Green.copy(alpha = 0.5f)),
                 enabled = allFieldsValid
             ) {
                 Text("Registrarse", color = Color.Black.copy(alpha = 0.75f))
@@ -475,10 +490,7 @@ fun UsuarioFormDialog(onDismiss: () -> Unit, onSubmit: (Map<String, String>) -> 
         dismissButton = {
             Button(
                 onClick = onDismiss,
-                colors = ButtonDefaults.run { val buttonColors: ButtonColors =
-                    buttonColors(Color.Red.copy(alpha = 0.5f))
-                    buttonColors
-                }
+                colors = ButtonDefaults.buttonColors(Color.Red.copy(alpha = 0.5f))
             ) {
                 Text("Cancelar", color = Color.Black.copy(alpha = 0.75f))
             }
@@ -492,28 +504,76 @@ fun showToast(context: Context, message: String) {
     toast.show()
 }
 
-fun onSubmitConductor(data: Map<String, String>, context: Context) {
-    val database = Firebase.database
-    val ref = database.getReference("conductores")
+fun isEmailExistInBoth(email: String, onResult: (Boolean) -> Unit) {
+    val database = FirebaseDatabase.getInstance()
+    val conductoresRef = database.getReference("conductores")
+    val usuariosRef = database.getReference("usuarios")
 
-    ref.push().setValue(data).addOnCompleteListener { task ->
-        if (task.isSuccessful) {
-            showToast(context, "Registro de conductor exitoso")
+    conductoresRef.orderByChild("correo").equalTo(email).addListenerForSingleValueEvent(object : ValueEventListener {
+        override fun onDataChange(conductoresSnapshot: DataSnapshot) {
+            if (conductoresSnapshot.exists()) {
+                onResult(true)
+            } else {
+                usuariosRef.orderByChild("correo").equalTo(email).addListenerForSingleValueEvent(object : ValueEventListener {
+                    override fun onDataChange(usuariosSnapshot: DataSnapshot) {
+                        onResult(usuariosSnapshot.exists())
+                    }
+
+                    override fun onCancelled(error: DatabaseError) {
+                        onResult(false) // En caso de error, asumir que el correo no existe para permitir la continuación
+                    }
+                })
+            }
+        }
+
+        override fun onCancelled(error: DatabaseError) {
+            onResult(false) // En caso de error, asumir que el correo no existe para permitir la continuación
+        }
+    })
+}
+
+fun onSubmitConductor(data: Map<String, String>, context: Context, onDismiss: () -> Unit) {
+    val correo = data["correo"] ?: ""
+
+    isEmailExistInBoth(correo) { emailExist ->
+        if (emailExist) {
+            showToast(context, "El correo ya está registrado. Por favor, utiliza otro correo.")
         } else {
-            showToast(context, "Error al registrar conductor: ${task.exception?.message}")
+            val database = Firebase.database
+            val ref = database.getReference("conductores")
+
+            // Proceder con el registro
+            ref.push().setValue(data).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    showToast(context, "Registro de conductor exitoso")
+                    onDismiss()  // Cerrar el diálogo al completar el registro exitosamente
+                } else {
+                    showToast(context, "Error al registrar conductor: ${task.exception?.message}")
+                }
+            }
         }
     }
 }
 
-fun onSubmitUsuario(data: Map<String, String>, context: Context) {
-    val database = Firebase.database
-    val ref = database.getReference("usuarios")
+fun onSubmitUsuario(data: Map<String, String>, context: Context, onDismiss: () -> Unit) {
+    val correo = data["correo"] ?: ""
 
-    ref.push().setValue(data).addOnCompleteListener { task ->
-        if (task.isSuccessful) {
-            showToast(context, "Registro de usuario exitoso")
+    isEmailExistInBoth(correo) { emailExist ->
+        if (emailExist) {
+            showToast(context, "El correo ya está registrado. Por favor, utiliza otro correo.")
         } else {
-            showToast(context, "Error al registrar usuario: ${task.exception?.message}")
+            val database = Firebase.database
+            val ref = database.getReference("usuarios")
+
+            // Proceder con el registro
+            ref.push().setValue(data).addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    showToast(context, "Registro de usuario exitoso")
+                    onDismiss()  // Cerrar el diálogo al completar el registro exitosamente
+                } else {
+                    showToast(context, "Error al registrar usuario: ${task.exception?.message}")
+                }
+            }
         }
     }
 }
